@@ -1,0 +1,20 @@
+sm-spc  streaming
+
+S-DSP CLOCK : 24576000  [1024*24*1000]   (tolerance: 24592800 Hz to 24645600)
+SPC CLOCK : 1024000 (MC/24)
+
+SNES CLOCK : 21.477MHz (tolerance: ?)
+
+6 rates selectable:
+ 2000, 4000, 6000, 8000, 10000, 12000
+
+RATE	SAMPLES/FRAME	BLOCKS/FRAME
+12KHZ	200		13
+10KHZ	166.7		11
+8KHZ	133.3		9
+6KHZ	100		7
+4KHZ	66.7		5
+2KHZ	33.3		3
+
+Prime buffer by sending 12x more blocks on initial transfer
+

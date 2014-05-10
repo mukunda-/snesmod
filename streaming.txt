@@ -1,0 +1,121 @@
+sm-spc  streaming
+
+S-DSP CLOCK : 24576000  [1024*24*1000]   (tolerance: 24592800 Hz to 24645600)
+SPC CLOCK : 1024000 (MC/24)
+
+SNES CLOCK : 21.477MHz (tolerance: ?)
+
+;===============================================================
+SPC MESSAGES:
+EDS : ENABLE DIGITAL STREAM
+DDS : DISABLE DIGITAL STREAM
+[plus special data message for filling ring buffer]
+;===============================================================
+
+streaming uses 12KHz sample rate (12000 HZ)
+
+12000: 200 samples/100 bytes per frame
+
+400 samples double buffered (25 blocks)
+
+use 28 blocks to max out 8-bit index
+
+at 12KHz sample rate is 2048 dspcyc (85 1/3 spc) (256 cyc/3*16 samples) (
+
+
+1536
+1640 = 12812.5 khz
+80spc cyc = 12800 KHz (1638.4
+
+
+================================================================
+filling code
+=================================================================
+
+STREAM:
+	.block	252
+
+; [header]
+STREAM1  = STREAM+1
+STREAM2  = STREAM+2
+STREAM3  = STREAM+3
+STREAM4  = STREAM+4
+STREAM5  = STREAM+5
+STREAM6  = STREAM+6
+STREAM7  = STREAM+7
+STREAM8  = STREAM+8
+; [header]
+STREAM9  = STREAM+10
+STREAM10 = STREAM+11
+STREAM11 = STREAM+12
+STREAM12 = STREAM+13
+STREAM13 = STREAM+14
+STREAM14 = STREAM+15
+STREAM15 = STREAM+16
+STREAM16 = STREAM+17
+; [header]
+;+18 next chunk
+
+PD_Ret
+	reti
+ProcessDigital:
+
+	pha
+	mov	a, SPC_COUNTER2
+	beq	
+
+	clc
+	
+pd_dataloop:
+	mov	a, SPC_PORT0		; 3-2
+	mov	STREAM1+y, a		; 6-3
+	mov	a, SPC_PORT1		; 3-2
+	mov	STREAM2+y, a		; 6-3
+	mov	a, SPC_PORT2		; 3-2
+	mov	STREAM3+y, a		; 6-3
+	mov	a, SPC_PORT3		; 3-2
+	mov	STREAM4+y, a		; 6-3
+	mov	a, SPC_PORT0
+	mov	STREAM5+y, a
+	mov	a, SPC_PORT1
+	mov	STREAM6+y, a
+	mov	a, SPC_PORT2
+	mov	STREAM7+y, a
+	mov	a, SPC_PORT3
+	mov	STREAM8+y, a
+	mov	a, SPC_PORT0
+	mov	STREAM9+y, a
+	mov	a, SPC_PORT1
+	mov	STREAM10+y, a
+	mov	a, SPC_PORT2
+	mov	STREAM11+y, a
+	mov	a, SPC_PORT3
+	mov	STREAM12+y, a
+	mov	a, SPC_PORT0
+	mov	STREAM13+y, a
+	mov	a, SPC_PORT1
+	mov	STREAM14+y, a
+	mov	a, SPC_PORT2
+	mov	STREAM15+y, a
+	mov	a, SPC_PORT3
+	mov	STREAM16+y, a
+
+	mov	SPC_PORT0, x		; 4-2 SYNC POINT
+	
+	mov	a, y			; 2-1
+	adc	#17			; 2-2
+	cmp	#225			; 2-2
+	beq	pd_wrap			; 2-2
+pd_wrapped:
+	mov	y, a			; 2-2
+	dec	x			; 2-2
+	bne	pd_dataloop		; 4-2
+
+	; 164 cyc/iteration
+	; 10.25 cyc/byte
+	; (need 100 bytes: = 1025 cycles)
+
+pd_wrap:
+	mov	a, #0
+	clc
+	bra	pd_wrapped
