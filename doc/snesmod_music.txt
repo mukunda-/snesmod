@@ -1,30 +1,30 @@
 .-----------------------------------------------------------------------.
 | SNESMOD COMPOSITION RULES                                             |
 |-----------------------------------------------------------------------|
-| Impulse tracker format must be used. 8 Channels MAX!                  |
+| Only Impulse Tracker modules with max 8 channels are supported.       |
 |                                                                       |
-| Notes can not exceed 128Khz playback rate!!                           |
+| Notes can not exceed 128Khz playback rate!                            |
 |                                                                       |
-| The module must be in instrument mode. It must have instruments!      |
+| The module must be in instrument mode. It must have instruments.      |
 |                                                                       |
-| DO NOT USE UNDEFINED INSTRUMENTS, they will not silence the channel,  |
-| THEY WILL CAUSE MALFUNCTION!                                          |
+| Do not use undefined instruments. They will not silence the channel   |
+| and will cause undefined behavior.                                    |
 |                                                                       |
 | The 64 or less samples must fit within 58K of memory. This is AFTER   |
 | "BRR" compression. 8-bit samples will be reduced to 9/16 size. 16-bit |
 | samples will be reduced to 9/32 size.                                /
 |=====================================================================|
-| Cut Features                                                        |
+| Excluded Features                                                   |
 |---------------------------------------------------------------------|
-| There is not be a complete IT implementation, here are some         |
-| IT features that you must not use:                                  |
+| There is not a complete Impulse Tracker implementation, here are    |
+| some features that you must not use:                                |
 |                                                                     |
 | * New Note Actions are not supported.                               |
 | * Complex sample mapping is not supported.                          |
-|     Only the center entry in each instruments sample map will be    |
-|     used for the entire map! (and the note values are ignored!!!)   |
+|     Only the middle entry in each instrument's sample map will be   |
+|     used for the entire map, and the note values are ignored.       |
 | * Pitch envelope is not supported.                                  |
-| * No stereo samples!!                                               |
+| * No stereo samples.                                                |
 | * Envelope sustain must remain on one node only.                    |
 | * Envelope nodes must be only 1 to 256 ticks apart.                 |
 | * Envelope carry is not supported.                                  |
@@ -34,7 +34,7 @@
 | * Only linear frequency mode is supported.                          |
 | * Gxx must not share memory with Exx/Fxx.                           |
 | * Auto-vibrato is not supported.                                    |
-| * Filters are not supported. (doy)                                  |
+| * Filters are not supported.                                        |
 | * These volume effects are not supported:                           |
 |     Ex, Fx, Gx, Hx                                                  |
 | * No memory for volume commands. (A0,B0,C0,D0 will do nothing)      |
@@ -51,11 +51,12 @@
 |     SAy - not supported                                             |
 |     SBx - not supported - pattern loop, sorry :(                    |
 |     Zxx - not supported                                             |
+| * Panning envelopes are not supported.                              |
+| * Tremor (Ixy) is not supported.                                    |
+| * Tremolo (Rxy) is not supported.                                   |
+| * Panbrello (Yxy) is not supported.                                 |
 |                                                                     |
-| And because mukunda is so damn lazy these are also not supported:   |
-|  panning envelopes, tremor, tremolo, panbrello                      |
-|                                                                     |
-| * "+++" patterns ARE supported!!!                                   |
+| * "+++" patterns ARE supported!                                     |
 |=====================================================================|
 | Echo commands                                                       |
 |---------------------------------------------------------------------|
@@ -71,16 +72,18 @@
 | conversion. SEE "SPECIAL SONG MESSAGE COMMANDS"                     |
 |                                                                     |
 | NOTE: When setting the Echo Delay parameter, you lose "2K x D" of   |
-| sample memory from the SPC.                                         |
+| sample memory from the SPC. This memory is used by the echo buffer, |
+| reducing how much sample data you can load.                         |
 |=====================================================================|
 | Quality                                                             |
 |---------------------------------------------------------------------|
 | 16-bit quality is recommened for the SPC samples, since they        |
 | have more data for compressing.                                     |
 |                                                                     |
-| If the loop width of an SPC sample is not a multiple of 16 then the |
-| sample will be unrolled OR resampled with linear interpolation for  |
-| alignment. (it will be resampled if unrolling uses too much memory) |
+| WARNING: Samples must be a multiple of 16 or they will be           |
+| "unrolled" or resampled with linear interpolation to align on the   |
+| 16-sample boundary. (It will be resampled if unrolling uses too     |
+| much memory.)                                                       |
 |                                                                     |
 | Do not downsample your SPC samples too much or else they will sound |
 | like butt.                                                          |
@@ -88,21 +91,21 @@
 | Sample offset is supported for the SPC samples, but there is a      |
 | small chance of creating unwanted NOISE because of the compression. |
 |                                                                     |
-| ALSO NOTE BIDI SAMPLES WILL BE UNROLLED AND USE UP LOTS OF SPACE.   |
+| WARNING: BIDI samples will be unrolled and potentially use up a lot |
+| of space.                                                           |
 |                                                                     |
-| *ALSO* If you are making songs for a game remember that channel 8   |
-| will be OVERWRITTEN with sound effects. Don't put important stuff   |
-| there.                                                              |
+| If you are making songs for a game, channel 8 may be randomly       |
+| overridden by sound effects. So don't put your lead melody there.   |
 |=====================================================================|
 | SPECIAL SONG MESSAGE COMMANDS                                       |
 |---------------------------------------------------------------------|
-| To control the echo parameters for a module you must specify some   |
-| things in the song message.                                         |
+| To control the echo parameters for a module you must specify        |
+| additional commands in the song message.                            |
 |                                                                     |
-| To trigger this you must put an "[[SNESMOD]]" tag in your song      |
-| message followed by special commands!                               |
+| To configure echo, add an "[[SNESMOD]]" tag in your song message    |
+| followed by the desired commands.                                   |
 |                                                                     |
-| See the example IT module, it has song message commands!            |
+| See the example IT module, it has these commands.                   |
 |                                                                     |
 | Command List:                                                       |
 |                                                                     |
