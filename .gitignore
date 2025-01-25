@@ -49,6 +49,7 @@ x64/
 build/
 [Bb]in/
 [Oo]bj/
+Browse.*
 
 # MSTest test Results
 [Tt]est[Rr]esult*/
@@ -213,3 +214,6 @@ pip-log.txt
 
 #Mr Developer
 .mr.developer.cfg
+
+.testdata-*
+*.Autosave.*
