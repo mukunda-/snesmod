@@ -1,0 +1,1 @@
+This is the original C++ source code for smconv. This is superseded by the [Go version](https://github.com/mukunda-/snesmod/tree/master/smconv) now.
