@@ -3,7 +3,7 @@
 # (C) 2025 Mukunda Johnson (mukunda.com)
 # Licensed under MIT
 
-# Frequency Look Up Table generator.
+# Frequency Look Up Table generator for the SPC driver.
 
 print("LUT_FTAB:", end="")
 

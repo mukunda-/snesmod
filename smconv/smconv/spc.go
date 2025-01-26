@@ -14,12 +14,53 @@ import (
 	_ "embed"
 )
 
-//go:embed spc-driver.bin
+//go:embed sm_spc.bin
 var spcDriverBinary []byte
+
+const kSpcPatchStart = 0x3C
 
 var ErrModuleTooBig = errors.New("total module data is too big to fit in SPC memory")
 
+func verifySpcPatchSignature() bool {
+	// When updating the SPC driver, the patch location must be verified.
+	// We'll do a signature check against the patch region. This is executed in tests and
+	// at runtime.
+
+	// 0457   043C             spc_patch_start:
+	// 0458   043C 2F 08       	bra	spc_patch_end
+	// 0460   043E 3F CF 06    	call	Module_Stop
+	// 0461   0441 E8 00       	mov	a, #0
+	// 0462   0443 3F D9 06    	call	Module_Start
+	// 0463   0446             spc_patch_end:
+
+	// 0x55 = wildcard
+	signature := []byte{
+		0x2f, 0x08,
+		0x3f, 0x55, 0x55,
+		0xe8, 0x00,
+		0x3f, 0x55, 0x55,
+	}
+
+	// To update the signature, refer to build/sm_spc.lst after assembling the driver.
+
+	for i := 0; i < len(signature); i++ {
+		if signature[i] == 0x55 {
+			continue //wildcard (linked address)
+		}
+		if signature[i] != spcDriverBinary[kSpcPatchStart+i] {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (bank *SoundBank) WriteSpcFile(filename string) error {
+
+	if !verifySpcPatchSignature() {
+		panic("SPC driver signature mismatch. It looks like someone didn't run all tests before publishing this version. Please update to use the SPC export function.")
+	}
+
 	file, err := os.Create(filename)
 	if err != nil {
 		return err
@@ -54,10 +95,10 @@ func (bank *SoundBank) WriteSpcFile(filename string) error {
 
 	copy(spcf.Memory[memSpcProgram:], spcDriverBinary)
 
-	// See "patch for it->spc conversion" in driver source. This allows the module
-	// to start playing immediately.
-	spcf.Memory[memSpcProgram+0x3C] = 0 // PATCH
-	spcf.Memory[memSpcProgram+0x3D] = 0
+	// See "spc_patch_start" in driver source. This allows the module to start playing
+	// immediately. This address is verified in spc_test.go.
+	spcf.Memory[memSpcProgram+kSpcPatchStart] = 0
+	spcf.Memory[memSpcProgram+kSpcPatchStart+1] = 0
 
 	moduleBuffer := &SeekingByteBuffer{}
 	err = bank.Modules[0].Export(moduleBuffer, false)

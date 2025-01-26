@@ -55,9 +55,7 @@ Example to create a soundbank for a project:
   smconv -s -o build/soundbank -h input1.it input2.it
 
 Example to convert IT to SPC:
-  smconv input.it
-
-TIP: use -v to view how much RAM the modules will use.`
+  smconv input.it`
 
 type programArgs struct {
 	Help          bool

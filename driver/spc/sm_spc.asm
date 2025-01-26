@@ -454,12 +454,13 @@ _clrmem:
 	mov	SPC_CONTROL, #%110
 	
 ;----------------------------------------------------------------------
-	bra	patch1			; patch for it->spc conversion
-					;
+spc_patch_start:
+	bra	spc_patch_end		; When creating SPC files, nop this branch out
+					; to start the song during boot.
 	call	Module_Stop		;
 	mov	a, #0			;
 	call	Module_Start		;
-patch1:					;
+spc_patch_end:
 ;----------------------------------------------------------------------
 
 ;--------------------------------------------------------
@@ -1956,67 +1957,65 @@ _cpc_nott0:
 	
 cpc_jump:
 	jmp	$0011
-	
-; note: tasm has some kind of bug that removes the 16th character
-; in macro args (...?)
+
 ;-----------------------------------------------------------------------
 CMD_JUMPTABLE_L:
 ;-----------------------------------------------------------------------
-	.byte	LBYTE(Command_SetSpeed)			; Axx
-	.byte	LBYTE(Command_SetPositiion)		; Bxx
-	.byte	LBYTE(Command_PatternBrreak)		; Cxx
-	.byte	LBYTE(Command_VolumeSliide)		; Dxy
-	.byte	LBYTE(Command_PitchSliddeDown)		; Exy
-	.byte	LBYTE(Command_PitchSliddeUp)		; Fxy
-	.byte	LBYTE(Command_Glissandoo)		; Gxx
-	.byte	LBYTE(Command_Vibrato)			; Hxy
-	.byte	LBYTE(Command_Tremor)			; Ixy
-	.byte	LBYTE(Command_Arpeggio)			; Jxy
-	.byte	LBYTE(Command_VolumeSliideVibrato)	; Kxy
-	.byte	LBYTE(Command_VolumeSliideGliss)	; Lxy
-	.byte	LBYTE(Command_SetChanneelVolume)	; Mxx
-	.byte	LBYTE(Command_ChannelVoolumeSlide)	; Nxy
-	.byte	LBYTE(Command_SampleOfffset)		; Oxx
-	.byte	LBYTE(Command_PanningSllide)		; Pxy
-	.byte	LBYTE(Command_RetriggerrNote)		; Qxy
-	.byte	LBYTE(Command_Tremolo)			; Rxy
-	.byte	LBYTE(Command_Extended)			; Sxy
-	.byte	LBYTE(Command_Tempo)			; Txy
-	.byte	LBYTE(Command_FineVibraato)		; Uxy
-	.byte	LBYTE(Command_SetGloballVolume)		; Vxx
-	.byte	LBYTE(Command_GlobalVollumeSlide)	; Wxy
-	.byte	LBYTE(Command_SetPanninng)		; Xxx
-	.byte	LBYTE(Command_Panbrelloo)		; Yxy
-	.byte	LBYTE(Command_MidiMacroo)		; Zxy
+	.byte	Command_SetSpeed & 0FFh			; Axx
+	.byte	Command_SetPosition & 0FFh		; Bxx
+	.byte	Command_PatternBreak & 0FFh		; Cxx
+	.byte	Command_VolumeSlide & 0FFh		; Dxy
+	.byte	Command_PitchSlideDown & 0FFh		; Exy
+	.byte	Command_PitchSlideUp & 0FFh		; Fxy
+	.byte	Command_Glissando & 0FFh		; Gxx
+	.byte	Command_Vibrato & 0FFh			; Hxy
+	.byte	Command_Tremor & 0FFh			; Ixy
+	.byte	Command_Arpeggio & 0FFh			; Jxy
+	.byte	Command_VolumeSlideVibrato & 0FFh	; Kxy
+	.byte	Command_VolumeSlideGliss & 0FFh		; Lxy
+	.byte	Command_SetChannelVolume & 0FFh		; Mxx
+	.byte	Command_ChannelVolumeSlide & 0FFh	; Nxy
+	.byte	Command_SampleOffset & 0FFh		; Oxx
+	.byte	Command_PanningSlide & 0FFh		; Pxy
+	.byte	Command_RetriggerNote & 0FFh		; Qxy
+	.byte	Command_Tremolo & 0FFh			; Rxy
+	.byte	Command_Extended & 0FFh			; Sxy
+	.byte	Command_Tempo & 0FFh			; Txy
+	.byte	Command_FineVibrato & 0FFh		; Uxy
+	.byte	Command_SetGlobalVolume & 0FFh		; Vxx
+	.byte	Command_GlobalVolumeSlide & 0FFh	; Wxy
+	.byte	Command_SetPanning & 0FFh		; Xxx
+	.byte	Command_Panbrello & 0FFh		; Yxy
+	.byte	Command_MidiMacro & 0FFh		; Zxy
 ;-----------------------------------------------------------------------
 CMD_JUMPTABLE_H:
 ;-----------------------------------------------------------------------
-	.byte	HBYTE(Command_SetSpeed)			; Axx
-	.byte	HBYTE(Command_SetPositiion)		; Bxx
-	.byte	HBYTE(Command_PatternBrreak)		; Cxx
-	.byte	HBYTE(Command_VolumeSliide)		; Dxy
-	.byte	HBYTE(Command_PitchSliddeDown)		; Exy
-	.byte	HBYTE(Command_PitchSliddeUp)		; Fxy
-	.byte	HBYTE(Command_Glissandoo)		; Gxx
-	.byte	HBYTE(Command_Vibrato)			; Hxy
-	.byte	HBYTE(Command_Tremor)			; Ixy
-	.byte	HBYTE(Command_Arpeggio)			; Jxy
-	.byte	HBYTE(Command_VolumeSliideVibrato)	; Kxy
-	.byte	HBYTE(Command_VolumeSliideGliss)	; Lxy
-	.byte	HBYTE(Command_SetChanneelVolume)	; Mxx
-	.byte	HBYTE(Command_ChannelVoolumeSlide)	; Nxy
-	.byte	HBYTE(Command_SampleOfffset)		; Oxx
-	.byte	HBYTE(Command_PanningSllide)		; Pxy
-	.byte	HBYTE(Command_RetriggerrNote)		; Qxy
-	.byte	HBYTE(Command_Tremolo)			; Rxy
-	.byte	HBYTE(Command_Extended)			; Sxy
-	.byte	HBYTE(Command_Tempo)			; Txy
-	.byte	HBYTE(Command_FineVibraato)		; Uxy
-	.byte	HBYTE(Command_SetGloballVolume)		; Vxx
-	.byte	HBYTE(Command_GlobalVollumeSlide)	; Wxy
-	.byte	HBYTE(Command_SetPanninng)		; Xxx
-	.byte	HBYTE(Command_Panbrelloo)		; Yxy
-	.byte	HBYTE(Command_MidiMacroo)		; Zxy
+	.byte	Command_SetSpeed >> 8			; Axx
+	.byte	Command_SetPosition >> 8		; Bxx
+	.byte	Command_PatternBreak >> 8		; Cxx
+	.byte	Command_VolumeSlide >> 8		; Dxy
+	.byte	Command_PitchSlideDown >> 8		; Exy
+	.byte	Command_PitchSlideUp >> 8		; Fxy
+	.byte	Command_Glissando >> 8			; Gxx
+	.byte	Command_Vibrato >> 8			; Hxy
+	.byte	Command_Tremor >> 8			; Ixy
+	.byte	Command_Arpeggio >> 8			; Jxy
+	.byte	Command_VolumeSlideVibrato >> 8		; Kxy
+	.byte	Command_VolumeSlideGliss >> 8		; Lxy
+	.byte	Command_SetChannelVolume >> 8		; Mxx
+	.byte	Command_ChannelVolumeSlide >> 8		; Nxy
+	.byte	Command_SampleOffset >> 8		; Oxx
+	.byte	Command_PanningSlide >> 8		; Pxy
+	.byte	Command_RetriggerNote >> 8		; Qxy
+	.byte	Command_Tremolo >> 8			; Rxy
+	.byte	Command_Extended >> 8			; Sxy
+	.byte	Command_Tempo >> 8			; Txy
+	.byte	Command_FineVibrato >> 8		; Uxy
+	.byte	Command_SetGlobalVolume >> 8		; Vxx
+	.byte	Command_GlobalVolumeSlide >> 8		; Wxy
+	.byte	Command_SetPanning >> 8			; Xxx
+	.byte	Command_Panbrello >> 8			; Yxy
+	.byte	Command_MidiMacro >> 8			; Zxy
 
 ;=======================================================================
 Command_SetSpeed:
@@ -2448,39 +2447,39 @@ SCommand_Null:
 	ret
 	
 CmdExTab_L:
-	.byte	LBYTE(SCommand_Echo)
-	.byte	LBYTE(SCommand_Null)
-	.byte	LBYTE(SCommand_Null)
-	.byte	LBYTE(SCommand_Null)
-	.byte	LBYTE(SCommand_Null)
-	.byte	LBYTE(SCommand_Null)
-	.byte	LBYTE(SCommand_Null)
-	.byte	LBYTE(SCommand_Null)
-	.byte	LBYTE(SCommand_Panning)
-	.byte	LBYTE(SCommand_SoundCo ntrol)
-	.byte	LBYTE(SCommand_Null)
-	.byte	LBYTE(SCommand_Null)
-	.byte	LBYTE(SCommand_NoteCut)
-	.byte	LBYTE(SCommand_NoteDelXay)
-	.byte	LBYTE(SCommand_Null)
-	.byte	LBYTE(SCommand_Cue)
+	.byte	SCommand_Echo & 0FFh
+	.byte	SCommand_Null & 0FFh
+	.byte	SCommand_Null & 0FFh
+	.byte	SCommand_Null & 0FFh
+	.byte	SCommand_Null & 0FFh
+	.byte	SCommand_Null & 0FFh
+	.byte	SCommand_Null & 0FFh
+	.byte	SCommand_Null & 0FFh
+	.byte	SCommand_Panning & 0FFh
+	.byte	SCommand_SoundControl & 0FFh
+	.byte	SCommand_Null & 0FFh
+	.byte	SCommand_Null & 0FFh
+	.byte	SCommand_NoteCut & 0FFh
+	.byte	SCommand_NoteDelay & 0FFh
+	.byte	SCommand_Null & 0FFh
+	.byte	SCommand_Cue & 0FFh
 CmdExTab_H:
-	.byte	HBYTE(SCommand_Echo)
-	.byte	HBYTE(SCommand_Null)
-	.byte	HBYTE(SCommand_Null)
-	.byte	HBYTE(SCommand_Null)
-	.byte	HBYTE(SCommand_Null)
-	.byte	HBYTE(SCommand_Null)
-	.byte	HBYTE(SCommand_Null)
-	.byte	HBYTE(SCommand_Null)
-	.byte	HBYTE(SCommand_Panning)
-	.byte	HBYTE(SCommand_SoundCo ntrol)
-	.byte	HBYTE(SCommand_Null)
-	.byte	HBYTE(SCommand_Null)
-	.byte	HBYTE(SCommand_NoteCut)
-	.byte	HBYTE(SCommand_NoteDelXay)
-	.byte	HBYTE(SCommand_Null)
-	.byte	HBYTE(SCommand_Cue)
+	.byte	SCommand_Echo >> 8
+	.byte	SCommand_Null >> 8
+	.byte	SCommand_Null >> 8
+	.byte	SCommand_Null >> 8
+	.byte	SCommand_Null >> 8
+	.byte	SCommand_Null >> 8
+	.byte	SCommand_Null >> 8
+	.byte	SCommand_Null >> 8
+	.byte	SCommand_Panning >> 8
+	.byte	SCommand_SoundControl >> 8
+	.byte	SCommand_Null >> 8
+	.byte	SCommand_Null >> 8
+	.byte	SCommand_NoteCut >> 8
+	.byte	SCommand_NoteDelay >> 8
+	.byte	SCommand_Null >> 8
+	.byte	SCommand_Cue >> 8
 
 ; S01 = turn on echo
 ; S02 = turn off echo
