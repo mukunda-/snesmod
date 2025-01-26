@@ -3,7 +3,7 @@
 |-----------------------------------------------------------------------|
 | Only Impulse Tracker modules with max 8 channels are supported.       |
 |                                                                       |
-| Notes can not exceed 128Khz playback rate!                            |
+| Notes cannot exceed 128Khz playback rate!                             |
 |                                                                       |
 | The module must be in instrument mode. It must have instruments.      |
 |                                                                       |
@@ -190,7 +190,7 @@
 |                                                                     |
 | Here is an example song message with commands in it:                |
 |---------------------------------------------------------------------|
-| Here is my song, blah blah blah blah                                |
+| Here is my magical song. Listen carefully.                          |
 | By Mr.X                                                             |
 |                                                                     |
 | [[SNESMOD]]                                                         |
