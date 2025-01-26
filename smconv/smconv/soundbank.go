@@ -2,6 +2,8 @@
 // (C) 2025 Mukunda Johnson (mukunda.com)
 // Licensed under MIT
 
+// This file describes the high-level soundbank structure.
+
 package smconv
 
 import (

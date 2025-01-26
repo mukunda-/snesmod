@@ -15,16 +15,10 @@ import (
 )
 
 const (
+	// Maximum number of samples that can be unrolled. If unrolling the loop results in
+	// more than this many samples, then it will be resampled instead.
 	kMaxUnrollThreshold = 2000
-	kLoopLossTolerance  = 30000
 )
-
-// const (
-// 	kSampHeadEnd	=1
-// 	SAMPHEAD_LOOP	=2
-// 	SAMPHEAD_FILTER =12
-// 	SAMPHEAD_RANGE	=240
-// )
 
 // A source is a term for an audio sample in the soundbank.
 type Source struct {
@@ -37,7 +31,7 @@ type Source struct {
 	Data []byte
 
 	TuningFactor float64
-	ID           string
+	Id           string
 }
 
 var ErrUnsupportedSampleProperties = errors.New("unsupported sample properties")
@@ -101,7 +95,7 @@ func createSource(modsamp common.Sample) (*Source, error) {
 				// Unroll the loop to align.
 				// BrrCodec will handle this.
 			} else {
-				tuningFactor, sampleData, length, loopStart = resampleLoop(sampleData, loopStart, length, 16-(loopLength&15))
+				tuningFactor, sampleData, _, loopStart = resampleLoop(sampleData, loopStart, length, 16-(loopLength&15))
 			}
 
 		}
@@ -127,6 +121,8 @@ func createSource(modsamp common.Sample) (*Source, error) {
 }
 
 // Add `amount` samples to the loop region and return the new size and loop start.
+// Ideally samples should already be aligned to avoid this, given that the resampling
+// may not sound great.
 func resampleLoop(data []int16, loopStart int, length int, amount int) (tuning float64, resampledData []int16, newLength int, newLoopStart int) {
 
 	oldLength := length

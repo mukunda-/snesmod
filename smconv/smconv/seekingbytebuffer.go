@@ -2,6 +2,9 @@
 // (C) 2025 Mukunda Johnson (mukunda.com)
 // Licensed under MIT
 
+// This file describes a memory-based write-seek buffer, used for buffering and measuring
+// data before writing to a file.
+
 package smconv
 
 // In memory write-seek buffer.

@@ -104,21 +104,6 @@ type Id6Tags struct {
 	_                      [45]byte
 }
 
-func (idt *Id6Tags) Read(r io.Reader) error {
-	if err := binary.Read(r, binary.LittleEndian, &idt); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (idt *Id6Tags) Write(w io.Writer) error {
-	if err := binary.Write(w, binary.LittleEndian, &idt); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (spc *SpcFile) Read(r io.Reader) (rerr error) {
 	defer pguard(&rerr)
 
@@ -129,8 +114,7 @@ func (spc *SpcFile) Read(r io.Reader) (rerr error) {
 	bread(r, &spc.IplRom)
 
 	var err error
-	spc.Extended, err = io.ReadAll(r)
-	if err != nil {
+	if spc.Extended, err = io.ReadAll(r); err != nil {
 		return err
 	}
 
@@ -145,9 +129,7 @@ func (spc *SpcFile) Write(w io.Writer) (rerr error) {
 	bwrite(w, &spc.DspRegisters)
 	bwrite(w, &spc.Reserved)
 	bwrite(w, &spc.IplRom)
-	if _, err := w.Write(spc.Extended); err != nil {
-		return err
-	}
+	bwrite(w, spc.Extended)
 
 	return nil
 }

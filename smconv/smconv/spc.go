@@ -21,6 +21,7 @@ const kSpcPatchStart = 0x3C
 
 var ErrModuleTooBig = errors.New("total module data is too big to fit in SPC memory")
 
+// Returns true if the SPC driver patch signature could be verified.
 func verifySpcPatchSignature() bool {
 	// When updating the SPC driver, the patch location must be verified.
 	// We'll do a signature check against the patch region. This is executed in tests and
@@ -55,10 +56,11 @@ func verifySpcPatchSignature() bool {
 	return true
 }
 
+// Export the soundbank to an SPC file. The soundbank must have only one module in it.
 func (bank *SoundBank) WriteSpcFile(filename string) error {
 
 	if !verifySpcPatchSignature() {
-		panic("SPC driver signature mismatch. It looks like someone didn't run all tests before publishing this version. Please update to use the SPC export function.")
+		panic("SPC driver signature mismatch. Please update to use the SPC export function.")
 	}
 
 	file, err := os.Create(filename)
@@ -105,8 +107,6 @@ func (bank *SoundBank) WriteSpcFile(filename string) error {
 	if err != nil {
 		return err
 	}
-
-	//sourceTable := make([]uint16, len(bank.Modules[0].SourceList)*2)
 
 	for i := 0; i < len(bank.Modules[0].SourceList); i++ {
 		source := bank.Sources[bank.Modules[0].SourceList[i]]

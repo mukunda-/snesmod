@@ -150,7 +150,11 @@ func smconvCli(args []string) int {
 	if cfg.SoundbankMode {
 		clog.Infoln("Exporting sound bank.")
 		outputFile := strings.TrimSuffix(cfg.OutputFile, ".smbank")
-		bank.Export(outputFile, cfg.HiRom)
+
+		bank.Export(outputFile+".smbank", cfg.HiRom)
+		bank.ExportAssembly(outputFile+".asm", outputFile+".smbank")
+		bank.ExportAssemblyInclude(outputFile + ".inc")
+
 	} else {
 		clog.Infoln("Writing SPC file.")
 		// Export to SPC

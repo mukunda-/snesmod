@@ -2,102 +2,51 @@
 // (C) 2025 Mukunda Johnson (mukunda.com)
 // Licensed under MIT
 
+// This file describes the functions to export data to a soundbank file.
+
 package smconv
 
 import (
-	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 var ErrModuleSizeExceeded = errors.New("module size exceeded limit")
 
-func binwrite(w io.Writer, data any) error {
-	return binary.Write(w, binary.LittleEndian, data)
-}
+func (bank *SoundBank) Export(filename string, hirom bool) (rerr error) {
+	defer pguard(&rerr)
 
-func wtell(w io.WriteSeeker) (int64, error) {
-	return w.Seek(0, io.SeekCurrent)
-}
-
-/*
-func safecall(f func()) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			switch r.(type) {
-			case error:
-				err = r.(error)
-			default:
-				err = errors.New("unknown error")
-			}
-		}
-	}()
-
-	return f()
-}*/
-
-/*
-func (bank *SoundBank) export(filenameBase string) {
-
-}*/
-
-func (bank *SoundBank) Export(filenameBase string, hirom bool) (result error) {
-
-	bankFilename := filenameBase + ".smbank"
-	file, err := os.Create(bankFilename)
+	file, err := os.Create(filename)
 	if err != nil {
 		return err
 	}
 
-	if err := binwrite(file, uint16(len(bank.Sources))); err != nil {
-		return err
-	}
-
-	if err := binwrite(file, uint16(len(bank.Modules))); err != nil {
-		return err
-	}
+	bwrite(file, uint16(len(bank.Sources)))
+	bwrite(file, uint16(len(bank.Modules)))
 
 	// reserve space for tables
 	for i := 0; i < 128+len(bank.Sources); i++ {
-		file.Write([]byte{0xAA, 0xAA, 0xAA})
+		bwrite(file, []byte{0xAA, 0xAA, 0xAA})
 	}
 
 	modulePointers := []uint32{}
 	sourcePointers := []uint32{}
 
 	for _, module := range bank.Modules {
-		if position, err := wtell(file); err != nil {
-			return err
-		} else {
-			modulePointers = append(modulePointers, uint32(position))
-		}
-
-		if err := module.Export(file, true); err != nil {
-			return err
-		}
+		modulePointers = append(modulePointers, uint32(ptell(file)))
+		pcatch(module.Export(file, true))
 	}
 
 	for _, source := range bank.Sources {
-		if position, err := wtell(file); err != nil {
-			return err
-		} else {
-			sourcePointers = append(sourcePointers, uint32(position))
-		}
-		if err := source.Export(file, false); err != nil {
-			return err
-		}
-	}
-
-	if _, err := file.Seek(4, io.SeekStart); err != nil {
-		return err
+		sourcePointers = append(sourcePointers, uint32(ptell(file)))
+		pcatch(source.Export(file, false))
 	}
 
 	// export module pointers
-
-	if _, err := file.Seek(4, io.SeekStart); err != nil {
-		return err
-	}
+	pseek(file, 4, io.SeekStart)
 
 	for i := 0; i < 128; i++ {
 		addr := uint16(0)
@@ -112,13 +61,8 @@ func (bank *SoundBank) Export(filenameBase string, hirom bool) (result error) {
 			}
 		}
 
-		if err := binwrite(file, addr); err != nil {
-			return err
-		}
-
-		if err := binwrite(file, addrBank); err != nil {
-			return err
-		}
+		bwrite(file, addr)
+		bwrite(file, addrBank)
 	}
 
 	// export source pointers
@@ -132,69 +76,45 @@ func (bank *SoundBank) Export(filenameBase string, hirom bool) (result error) {
 			addr = uint16(0x8000 + (sourcePointers[i] & 32767))
 			addrBank = uint8(sourcePointers[i] >> 15)
 		}
-		if err := binwrite(file, addr); err != nil {
-			return err
-		}
 
-		if err := binwrite(file, addrBank); err != nil {
-			return err
-		}
+		bwrite(file, addr)
+		bwrite(file, addrBank)
 	}
 
 	return nil
 }
 
-func (mod *SmModule) Export(w io.WriteSeeker, writeHeader bool) error {
+func (mod *SmModule) Export(w io.WriteSeeker, writeHeader bool) (rerr error) {
+	defer pguard(&rerr)
 
-	headerStart, err := w.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return err
-	}
+	headerStart := ptell(w)
 
 	mod.BankHeader.ModuleSize = 0xAAAA
 	mod.BankHeader.SourceListCount = uint16(len(mod.SourceList))
 
 	if writeHeader {
 		// Reserve for module size
-		if err := binwrite(w, mod.BankHeader); err != nil {
-			return err
-		}
-
-		if err := binwrite(w, mod.SourceList); err != nil {
-			return err
-		}
+		bwrite(w, mod.BankHeader)
+		bwrite(w, mod.SourceList)
 	}
 
-	moduleStart, err := w.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return err
-	}
+	moduleStart := ptell(w)
 
 	pointers := SmModuleHeaderPointers{}
 
-	if err := binwrite(w, mod.Header); err != nil {
-		return err
-	}
+	bwrite(w, mod.Header)
 
 	patternPointers := []uint16{}
 	instrumentPointers := []uint16{}
 	samplePointers := []uint16{}
 
-	startOfPointers, err := w.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return err
-	}
+	startOfPointers := ptell(w)
 
 	// This is just to reserve space for now. We'll fill it in after.
-	if err := binwrite(w, pointers); err != nil {
-		return err
-	}
+	bwrite(w, pointers)
 
 	for i := 0; i < len(mod.Patterns); i++ {
-		ptr, err := w.Seek(0, io.SeekCurrent)
-		if err != nil {
-			return err
-		}
+		ptr := ptell(w)
 		ptr -= moduleStart
 
 		if ptr > kSpcRamSize {
@@ -202,16 +122,11 @@ func (mod *SmModule) Export(w io.WriteSeeker, writeHeader bool) error {
 		}
 
 		patternPointers = append(patternPointers, uint16(ptr+kModuleBase))
-		if err := mod.Patterns[i].Export(w); err != nil {
-			return err
-		}
+		pcatch(mod.Patterns[i].Export(w))
 	}
 
 	for i := 0; i < len(mod.Instruments); i++ {
-		ptr, err := w.Seek(0, io.SeekCurrent)
-		if err != nil {
-			return err
-		}
+		ptr := ptell(w)
 		ptr -= moduleStart
 
 		if ptr > kSpcRamSize {
@@ -219,16 +134,11 @@ func (mod *SmModule) Export(w io.WriteSeeker, writeHeader bool) error {
 		}
 
 		instrumentPointers = append(instrumentPointers, uint16(ptr+kModuleBase))
-		if err := mod.Instruments[i].Export(w); err != nil {
-			return err
-		}
+		pcatch(mod.Instruments[i].Export(w))
 	}
 
 	for i := 0; i < len(mod.Samples); i++ {
-		ptr, err := w.Seek(0, io.SeekCurrent)
-		if err != nil {
-			return err
-		}
+		ptr := ptell(w)
 		ptr -= moduleStart
 
 		if ptr > kSpcRamSize {
@@ -236,42 +146,26 @@ func (mod *SmModule) Export(w io.WriteSeeker, writeHeader bool) error {
 		}
 
 		samplePointers = append(samplePointers, uint16(ptr+kModuleBase))
-		if err := mod.Samples[i].Export(w); err != nil {
-			return err
-		}
+		pcatch(mod.Samples[i].Export(w))
 	}
 
-	moduleEnd, err := w.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return err
-	}
+	moduleEnd := ptell(w)
 
 	// Align end to 2 bytes.
 	if moduleEnd&1 != 0 {
-		_, err := w.Write([]byte{0x00})
-		if err != nil {
-			return err
-		}
+		bwrite(w, uint8(0))
 		moduleEnd++
 	}
 
 	if writeHeader {
-		_, err := w.Seek(headerStart, io.SeekStart)
-		if err != nil {
-			return err
-		}
+		pseek(w, headerStart, io.SeekStart)
 
 		// +1 for rouding up last word (not needed with the align above.
 		modSize := uint16((moduleEnd - moduleStart + 1) >> 1)
-		if err := binwrite(w, modSize); err != nil {
-			return err
-		}
+		bwrite(w, modSize)
 	}
 
-	_, err = w.Seek(startOfPointers, io.SeekStart)
-	if err != nil {
-		return err
-	}
+	pseek(w, startOfPointers, io.SeekStart)
 
 	for i := 0; i < 64; i++ {
 		if i < len(mod.Patterns) {
@@ -299,31 +193,25 @@ func (mod *SmModule) Export(w io.WriteSeeker, writeHeader bool) error {
 		}
 	}
 
-	if err := binwrite(w, pointers); err != nil {
-		return err
-	}
+	bwrite(w, pointers)
 
-	_, err = w.Seek(moduleEnd, io.SeekStart)
-	if err != nil {
-		return err
-	}
+	pseek(w, moduleEnd, io.SeekStart)
 
 	return nil
 }
 
-func (smp *SmPattern) Export(w io.WriteSeeker) error {
-	if err := binwrite(w, smp.Rows); err != nil {
-		return err
-	}
+func (smp *SmPattern) Export(w io.WriteSeeker) (rerr error) {
+	defer pguard(&rerr)
 
-	if err := binwrite(w, smp.Data); err != nil {
-		return err
-	}
+	bwrite(w, smp.Rows)
+	bwrite(w, smp.Data)
 
 	return nil
 }
 
-func (smi *SmInstrument) Export(w io.WriteSeeker) error {
+func (smi *SmInstrument) Export(w io.WriteSeeker) (rerr error) {
+	defer pguard(&rerr)
+
 	info1 := struct {
 		Fadeout        uint8
 		SampleIndex    uint8
@@ -338,9 +226,7 @@ func (smi *SmInstrument) Export(w io.WriteSeeker) error {
 	info1.SetPanning = smi.Info.SetPanning
 	info1.EnvelopeLength = smi.Info.EnvelopeLength
 
-	if err := binwrite(w, info1); err != nil {
-		return err
-	}
+	bwrite(w, info1)
 
 	if smi.Info.EnvelopeLength > 0 {
 		info2 := struct {
@@ -353,149 +239,104 @@ func (smi *SmInstrument) Export(w io.WriteSeeker) error {
 			EnvelopeLoopEnd:   smi.Info.EnvelopeLoopEnd,
 		}
 
-		if err := binwrite(w, info2); err != nil {
-			return err
-		}
-
-		if err := binwrite(w, smi.Envelope); err != nil {
-			return err
-		}
+		bwrite(w, info2)
+		bwrite(w, smi.Envelope)
 	}
 
 	return nil
 }
 
-func (sms *SmSample) Export(w io.WriteSeeker) error {
+func (sms *SmSample) Export(w io.WriteSeeker) (rerr error) {
+	defer pguard(&rerr)
 
-	if err := binwrite(w, sms); err != nil {
-		return err
-	}
+	bwrite(w, sms)
 
 	return nil
 }
 
-// Export to a file. `spcDirect` indicates that the file is directly in SPC memory, so
-// certain headers are not saved (since they would be stripped during the SPC loading
-// process). spcDirect is DATA only.
-func (source *Source) Export(w io.WriteSeeker, spcDirect bool) error {
-	if !spcDirect {
-		if err := binwrite(w, uint16(len(source.Data))); err != nil {
-			return err
-		}
+// Export to a file. `dataOnly` writes the BRR data only. This is used when building an
+// SPC file. When the source is loaded into SPC memory, there is no header or alignment.
+func (source *Source) Export(w io.WriteSeeker, dataOnly bool) (rerr error) {
+	defer pguard(&rerr)
 
-		if err := binwrite(w, uint16(source.Loop)); err != nil {
-			return err
-		}
+	if !dataOnly {
+		bwrite(w, uint16(len(source.Data)))
+		bwrite(w, uint16(source.Loop))
 	}
 
-	if err := binwrite(w, source.Data); err != nil {
-		return err
-	}
+	bwrite(w, source.Data)
 
-	if !spcDirect {
+	if !dataOnly {
 		if len(source.Data)&1 != 0 {
-			if err := binwrite(w, uint8(0)); err != nil {
-				return err
-			}
+			bwrite(w, uint8(0))
 		}
 	}
 
 	return nil
 }
 
-/*
+// Write ca65 assembly source file that includes the soundbank binary.
+func (bank *SoundBank) ExportAssembly(filename string, binfile string) (rerr error) {
+	pguard(&rerr)
 
-
-
-file.Close();
-
-std::string asm_out = output;
-asm_out += ".asm";
-ExportASM( bin_output.c_str(), asm_out.c_str() );
-
-std::string inc_out = output;
-inc_out += ".inc";
-ExportINC( inc_out.c_str() );
-}
-
-void Bank::ExportINC( const char *output ) const {
-FILE *f = fopen( output, "w" );
-
-fprintf( f,
-	"; snesmod soundbank definitions\n\n"
-	".ifndef __SOUNDBANK_DEFINITIONS__\n"
-	".define __SOUNDBANK_DEFINITIONS__\n\n"
-	".import __SOUNDBANK__\n\n");
-
-for i := 0; i < Modules.size(); i++ {
-	if( !Modules[i]->id.empty() ) {
-		fprintf( f, "%-32s = %i\n", Modules[i]->id.c_str(), i );
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
 	}
-}
-fprintf( f, "\n" );
 
-for i := 0; i < Sources.size(); i++ {
-	if( !Sources[i]->id.empty() ) {
-		fprintf( f, "%-32s = %i\n", Sources[i]->id.c_str(), i );
+	bwrite(file, []byte(`; SNESMOD Soundbank Data
+; Generated by SMCONV
+
+	.global __SOUNDBANK__
+	.segment "SOUNDBANK" ; This needs dedicated bank(s)
+__SOUNDBANK__:
+`))
+
+	binfile = strings.ReplaceAll(binfile, "\\", "/")
+	lastSlash := strings.LastIndex(binfile, "/")
+	if lastSlash != -1 {
+		binfile = binfile[lastSlash+1:]
 	}
-}
-fprintf( f, "\n.endif ; __SOUNDBANK_DEFINITIONS__\n" );
-fclose(f);
-}
 
-void Bank::ExportASM( const char *inputfile, const char *outputfile ) const {
-FILE *f = fopen( outputfile, "w" );
+	bwrite(file, []byte(fmt.Sprintf("\t.incbin \"%s\"\n", binfile)))
 
-int size = IO::FileSize( inputfile );
-
-fprintf( f,
-	";************************************************\n"
-	"; snesmod soundbank data                        *\n"
-	"; total size: %10i bytes                  *\n"
-	";************************************************\n"
-	"\n"
-	"\t.global __SOUNDBANK__\n"
-	"\t.segment \"SOUNDBANK\" ; need dedicated bank(s)\n\n"
-	"__SOUNDBANK__:\n",
-	size
-);
-
-std::string foo = inputfile;
-
-for i := 0; i < foo.size(); i++ {
-	if( foo[i] == '\\' ) foo[i] = '/';
-}
-int ffo = foo.find_last_of( '/' );
-if( ffo != std::string::npos )
-	foo = foo.substr( ffo + 1 );
-
-fprintf( f, "\t.incbin \"%s\"\n", foo.c_str() );
-
+	return nil
 }
 
-void Source::Export( IO::File &file, bool spc_direct ) const {
+// Write ca65 assembly include file that contains the soundbank definitions.
+func (bank *SoundBank) ExportAssemblyInclude(filename string) (rerr error) {
+	pguard(&rerr)
 
-if( !spc_direct ) {
-	file.Write16( Length );
-	file.Write16( Loop );
+	f, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	bwrite(f, []byte(`; SNESMOD Soundbank Definitions
+; GENERATED BY SMCONV
+
+.ifndef __SOUNDBANK_DEFINITIONS__
+.define __SOUNDBANK_DEFINITIONS__
+
+.import __SOUNDBANK__
+
+`))
+
+	for index, mod := range bank.Modules {
+		if mod.Id != "" {
+			bwrite(f, []byte(fmt.Sprintf("%-32s = %d\n", mod.Id, index)))
+		}
+	}
+
+	bwrite(f, []byte("\n"))
+
+	for index, source := range bank.Sources {
+		if source.Id != "" {
+			bwrite(f, []byte(fmt.Sprintf("%-32s = %d\n", source.Id, index)))
+		}
+	}
+	bwrite(f, []byte("\n.endif ; __SOUNDBANK_DEFINITIONS__\n"))
+
+	return nil
 }
-
-for( int i = 0; i < Length; i++ {
-	file.Write8( Data[i] );
-}
-
-if( !spc_direct ) {
-	if( Length & 1 )
-		file.Write8( 0 ); // align by 2
-}
-}
-
-
-
-
-
-
-
-
-
-*/

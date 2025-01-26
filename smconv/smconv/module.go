@@ -2,6 +2,9 @@
 // (C) 2025 Mukunda Johnson (mukunda.com)
 // Licensed under MIT
 
+// This file describes the conversion process between the common module format (modlib)
+// and the structures for SNESMOD.
+
 package smconv
 
 import (
