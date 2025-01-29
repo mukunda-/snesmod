@@ -13,7 +13,7 @@ func fileExists(filename string) bool {
 }
 
 func TestForSmoke(t *testing.T) {
-	smconvCli([]string{"smconv", "--help"})
+	assert.Zero(t, smconvCli([]string{"--help"}))
 }
 
 func TestToSpc(t *testing.T) {

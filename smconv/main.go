@@ -170,5 +170,5 @@ func smconvCli(args []string) int {
 
 // Entry point forwards to our inner function so we can overwrite args during testing.
 func main() {
-	os.Exit(smconvCli(os.Args))
+	os.Exit(smconvCli(os.Args[1:]))
 }
