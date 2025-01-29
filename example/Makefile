@@ -84,7 +84,7 @@ PNGFILES := $(foreach dir,$(GRAPHICS),$(notdir $(wildcard $(dir)/*.png)))
 # Audio files for conversion with snesmod.
 AUDIOFILES := $(foreach dir,$(AUDIO),$(notdir $(wildcard $(dir)/*.*)))
 
-# If a soundbank is generated, then include that source too.
+# If a soundbank is generated, then include that source plus snesmod sources.
 ifneq ($(AUDIOFILES),)
 SFILES := smconv_soundbank.asm snesmod.asm sm_spc.asm $(SFILES)
 endif
@@ -100,10 +100,6 @@ all : $(OUTPUT).sfc
 clean:
 	@echo Removing build files.
 	rm -fr $(BUILD)
-
-#-----------------------------------------------------------------------------------------
-# Main target
-$(OUTPUT).sfc : $(OFILES)
 
 #-----------------------------------------------------------------------------------------
 # Rule for converting PNG graphics
@@ -125,6 +121,7 @@ $(BUILD)/%.o : %.asm
 	@echo Assembling source :: $<
 	$(AS) $(ASFLAGS) $(INCLUDE) -o $@ $<
 
+#-----------------------------------------------------------------------------------------
 # For generated asm files.
 $(BUILD)/%.o : $(BUILD)/%.asm
 	mkdir -p $(BUILD)
@@ -133,7 +130,7 @@ $(BUILD)/%.o : $(BUILD)/%.asm
 
 #-----------------------------------------------------------------------------------------
 # Link step - create cartridge binary.
-$(BUILD)/%.sfc: $(OFILES) config.ld
+$(OUTPUT).sfc: $(OFILES) config.ld
 	@echo Linking...
 ifeq ($(MAPFILE),YES)
 	$(LD) $(LDFLAGS) -o $@ -m $(@:.sfc=.map) $(OFILES)
