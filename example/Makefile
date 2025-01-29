@@ -1,129 +1,147 @@
-.SECONDARY:
+# SNES Makefile Template
+#
+# 2025-01-17
+#*****************************************************************************************
 
-#---------------------------------------------------------------------------------
 .SUFFIXES:
-#---------------------------------------------------------------------------------
+.SECONDARY:
+.PHONY: clean
 
 ifeq ($(strip $(SNESKIT)),)
-$(error SNESKIT path not found, please add it to your environment)
+$(error SNESKIT not found, please add SNESKIT=<path to sneskit> to your environment)
 endif
 
-include	$(SNESKIT)/snes_rules
+SNESTOOLS := $(SNESKIT)/tools
+PMAGE     := $(SNESTOOLS)/pmage
+SNESCHK   := $(SNESTOOLS)/sneschk
+SMCONV    := $(SNESTOOLS)/smconv
+CC65      := $(SNESKIT)/cc65/bin
+AS        := $(CC65)/ca65
+LD        := $(CC65)/ld65
 
-#---------------------------------------------------------------------------------
-# TARGET is the name of the output
-# BUILD is the directory where object files & intermediate files will be placed
-# SOURCES is a list of directories containing source code
-# INCLUDES is a list of directories containing extra header files
-#---------------------------------------------------------------------------------
-TARGET		:=	test_driver
-BUILD		:=	build
-SOURCES		:=	snes test
-INCLUDES	:=	include
-GRAPHICS	:=	graphics
-AUDIO		:=	audio
-SOUND		:=	sound
+#-----------------------------------------------------------------------------------------
+# TARGET is the name of the output binary, excluding extension.
+# BUILD is the directory where object files & intermediate files will be placed.
+# SOURCES is a list of directories containing source code.
+# INCLUDES is a list of directories containing extra header files.
+# GRAPHICS is a list of directories containing image files for conversion.
+# AUDIO is a list of directories containing audio files.
+# MAPMODE is "lorom" or "hirom", configuring the cartridge type.
+# MAPFILE is YES if you want to generate a map file with the output.
+#-----------------------------------------------------------------------------------------
+TARGET   := $(notdir $(CURDIR))
+BUILD    := build
+SOURCES  := src
+INCLUDES := include
+GRAPHICS := graphics
+AUDIO    := audio
+MAPMODE  := hirom
+MAPFILE  := YES
 
-TASM		:=	/c/tasm301/TASM
+#-----------------------------------------------------------------------------------------
+# Bootstrap files
+STARTFILES  := snes_init.asm snes_zvars.asm snes_decompress.asm snes_joypad.asm
 
-MAPMODE		:=	hirom
+# Target 65816 CPU, -s = smart mode (tracks usage of rep and sep)
+ASFLAGS     := --cpu 65816 -s
 
-#---------------------------------------------------------------------------------
-# options for code generation
-#---------------------------------------------------------------------------------
-STARTFILES	:= snes_init snes_decompress snes_joypad snes_zvars
-ASFLAGS		:=	--cpu 65816 -s -D HIROM
-SMCONVFL	:= --hirom --soundbank --output soundbank
+# For snesmod (if used), we convert to a soundbank target.
+SOUNDBANK   := $(BUILD)/smconv_soundbank
+SMCONVFLAGS := --soundbank --output $(SOUNDBANK)
+SNESCHKFLAGS := --fix
 
-TASMFLAGS	:=	-07 -b -l
- 
-#---------------------------------------------------------------------------------
-ifneq ($(BUILD),$(notdir $(CURDIR)))
-#---------------------------------------------------------------------------------
-
-export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I $(CURDIR)/$(dir)) -I $(CURDIR)/$(BUILD) -I $(SNESKIT)/include -I $(CURDIR)
-
-export OUTPUT	:=	$(CURDIR)/$(TARGET)
-export	SPCBIN	:=	$(CURDIR)/sm_spc.obj
-
-export LDFLAGS	:=	-C $(CURDIR)/config.ld -o $(OUTPUT).smc
-
-export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) \
-					$(foreach dir,$(GRAPHICS),$(CURDIR)/$(dir)) \
-					$(foreach dir,$(AUDIO),$(CURDIR)/$(dir)) \
-					$(SNESKIT)/source
-
-SFILES		:=	$(STARTFILES:=.asm) sm_spc_image.asm $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.asm))) 
-PNGFILES	:=	$(foreach dir,$(GRAPHICS),$(notdir $(wildcard $(dir)/*.png)))
-
-export AUDIOFILES :=	$(foreach dir,$(AUDIO),$(notdir $(wildcard $(dir)/*.*)))
-export SOUNDFILES :=	$(foreach dir,$(SOUND),$(notdir $(wildcard $(dir)/*.wav)))
-
-ifneq ($(AUDIOFILES),)
-SFILES		:=	soundbank.asm $(SFILES)
-#export SBXML	:=	$(CURDIR)/audio.xml
-endif
-
-export OFILES	:=	$(PNGFILES:.png=.o) $(SFILES:.asm=.o)
- 
-.PHONY: $(BUILD) clean install
- 
-#---------------------------------------------------------------------------------
-$(BUILD):
-	@[ -d $@ ] || mkdir -p $@
-	@make --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
- 
-all	: $(BUILD)
-#---------------------------------------------------------------------------------
-clean:
-	@echo clean ...
-	@rm -fr $(BUILD) $(TARGET).smc $(TARGET).map $(SPCBIN) $(SPCBIN:.obj=.lst)
-	
-install:
-	cp snes/snesmod_dev.asm $(SNESKIT)/source/snesmod.asm
-	cp build/sm_spc_image.asm $(SNESKIT)/source/sm_spc.asm
-	cp include/snesmod.inc $(SNESKIT)/include/snesmod.inc
-
-#---------------------------------------------------------------------------------
+ifeq ($(MAPMODE),hirom)
+ASFLAGS     += -D HIROM
+SMCONVFLAGS += --hirom
+SNESCHKFLAGS += -m hirom
 else
- 
-#---------------------------------------------------------------------------------
-# main targets
-#---------------------------------------------------------------------------------
-$(OUTPUT).smc	: $(BRRFILES) $(OFILES)
-	@echo Linking...
-	@$(LD) $(LDFLAGS) $(OFILES) -o $@ -m $(@:.smc=.map)
-	@echo ROM Checkup...
-	@$(SNESCHK) $(MAPMODE) $@
-	@echo Okay! :: $(notdir $@)
-
-	
-%.o : %.asm
-%.o : %.asm $(SPCBIN)
-	@echo Assembling ... $(notdir $<)
-	@$(AS) $(ASFLAGS) $(INCLUDE) $< -o $@
-	
-sm_spc_image.asm : $(SPCBIN)
-	$(SNESTOOLS)/bin2ca $< RODATA SNESMOD_SPC $@
-
-$(SPCBIN) : ../spc/sm_spc.asm
-	cp ../tasm07.tab tasm07.tab
-	$(TASM) $(TASMFLAGS) $< ../SM_SPC.OBJ ../SM_SPC.LST
-	../bin2h ../SM_SPC.OBJ ../../convert/include/spc_program.h spc_program
-	
-%.asm : %.png %.grit 
-	@echo Converting ... $(notdir $<)
-	@$(SNESGRIT) $< -fta -fh!
-	
-#---------------------------------------------------------------------------------
-# rule for converting audio files
-#---------------------------------------------------------------------------------
-soundbank.asm : $(AUDIOFILES)
-	@echo Compiling Soundbank ...
-	$(SMCONV) $(SMCONVFL) $^ -v
-	
-
-
-#---------------------------------------------------------------------------------------
+SNESCHKFLAGS += -m lorom
 endif
-#---------------------------------------------------------------------------------------
+
+# Include paths.
+INCLUDE := $(foreach dir,$(INCLUDES),-I $(CURDIR)/$(dir)) \
+           -I $(CURDIR)/$(BUILD) \
+           -I $(SNESKIT)/include
+
+# Main target (the SFC filename).
+OUTPUT := $(BUILD)/$(TARGET)
+
+# Linker memory configuration.
+LDFLAGS := -C $(CURDIR)/config.ld
+
+# All sources.
+VPATH := $(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) \
+         $(foreach dir,$(GRAPHICS),$(CURDIR)/$(dir)) \
+         $(foreach dir,$(AUDIO),$(CURDIR)/$(dir)) \
+         $(SNESKIT)/source
+
+# Code files
+SFILES   := $(STARTFILES) $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.asm)))
+
+# Graphics files (converted to code)
+PNGFILES := $(foreach dir,$(GRAPHICS),$(notdir $(wildcard $(dir)/*.png)))
+
+# Audio files for conversion with snesmod.
+AUDIOFILES := $(foreach dir,$(AUDIO),$(notdir $(wildcard $(dir)/*.*)))
+
+# If a soundbank is generated, then include that source too.
+ifneq ($(AUDIOFILES),)
+SFILES := smconv_soundbank.asm snesmod.asm sm_spc.asm $(SFILES)
+endif
+
+# Gather total output files.
+OFILES := $(addprefix $(BUILD)/,$(PNGFILES:.png=.res.o)) \
+          $(addprefix $(BUILD)/,$(SFILES:.asm=.o))
+
+#-----------------------------------------------------------------------------------------
+all : $(OUTPUT).sfc
+
+#-----------------------------------------------------------------------------------------
+clean:
+	@echo Removing build files.
+	rm -fr $(BUILD)
+
+#-----------------------------------------------------------------------------------------
+# Main target
+$(OUTPUT).sfc : $(OFILES)
+
+#-----------------------------------------------------------------------------------------
+# Rule for converting PNG graphics
+$(BUILD)/%.res.asm : %.png %.yaml
+	mkdir -p $(BUILD)
+	$(PMAGE) --profile snes $< $@
+
+#-----------------------------------------------------------------------------------------
+# Converting audio files into a soundbank. This produces .smbank, .asm, and .inc files.
+$(SOUNDBANK).smbank $(SOUNDBANK).asm $(SOUNDBANK).inc : $(AUDIOFILES)
+	mkdir -p $(BUILD)
+	@echo Compiling Soundbank...
+	$(SMCONV) $(SMCONVFLAGS) $^
+
+#-----------------------------------------------------------------------------------------
+# Assembly step.
+$(BUILD)/%.o : %.asm
+	mkdir -p $(BUILD)
+	@echo Assembling source :: $<
+	$(AS) $(ASFLAGS) $(INCLUDE) -o $@ $<
+
+# For generated asm files.
+$(BUILD)/%.o : $(BUILD)/%.asm
+	mkdir -p $(BUILD)
+	@echo Assembling generated source :: $<
+	$(AS) $(ASFLAGS) $(INCLUDE) -o $@ $<
+
+#-----------------------------------------------------------------------------------------
+# Link step - create cartridge binary.
+$(BUILD)/%.sfc: $(OFILES) config.ld
+	@echo Linking...
+ifeq ($(MAPFILE),YES)
+	$(LD) $(LDFLAGS) -o $@ -m $(@:.sfc=.map) $(OFILES)
+else
+	$(LD) $(LDFLAGS) -o $@ $(OFILES)
+endif
+
+	@echo "Fixing up cartridge header"
+	$(SNESCHK) $(SNESCHKFLAGS) $@ 
+
+	@echo Okay! :: $(notdir $@)

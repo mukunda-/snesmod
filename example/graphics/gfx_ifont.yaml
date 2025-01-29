@@ -1,0 +1,5 @@
+tiles: 8x8
+export: pixels
+transparent: "#0072BC"
+compression: lz77
+colors: 4

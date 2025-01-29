@@ -1,15 +1,15 @@
 ;---------------------------------------------------
-; it2spc test bench
+; SNESMOD Example Program
 ;---------------------------------------------------
 
 .include "snes.inc"
 .include "snesmod.inc"
 .include "snes_joypad.inc"
-.include "soundbank.inc"
+.include "smconv_soundbank.inc"
 
 .global main, _nmi
 
-.import gfx_ifontTiles
+.import gfx_ifont_pixels
 .import DecompressDataVram
 
 .code
@@ -18,16 +18,16 @@
 SoundTable:
 ;==============================================================================
 SND_TEST = 0
-	.byte	4
-	.byte	8
-	.byte	15
+	.byte	6 ; pitch height >> 9  6=max
+	.byte	11 ; panning (8=center)
+	.byte	15 ;; volume (15=max)
 	.word	(TEST66_DATA_END-TEST66_DATA)/9
 	.word	.LOWORD(TEST66_DATA)
 	.byte	^TEST66_DATA
 ;------------------------------------------------------------------------------
 
 TEST66_DATA:
-.incbin "../sound/tada.brr"
+.incbin "../sound/wilhelm.brr"
 TEST66_DATA_END:
 
 
@@ -41,26 +41,26 @@ bgText = 1024
 ;---------------------------------------------------
 
 colour: .res 1
+song_index: .res 2
 
 ;---------------------------------------------------
 .code
 ;---------------------------------------------------
 
 main:
-	
 	lda	#80h
 	sta	REG_INIDISP
 	
 	stz	REG_CGADD	
 	stz	REG_CGDATA	; blue
-	lda	#80		;
+	lda	#$7c		;
 	sta	REG_CGDATA	;
 	lda	#0FFh		; white
 	sta	REG_CGDATA	;	
 	sta	REG_CGDATA	;
 	
-	ldx	#.LOWORD(gfx_ifontTiles)
-	lda	#^gfx_ifontTiles
+	ldx	#.LOWORD(gfx_ifont_pixels)
+	lda	#^gfx_ifont_pixels
 	ldy	#32*16
 	jsr	DecompressDataVram
 	
@@ -76,6 +76,18 @@ main:
 	ldx	#bgText+1+32
 	ldy	#test_message
 	jsr	DrawString
+	ldx	#bgText+1+160
+	ldy	#message2
+	jsr	DrawString
+	ldx	#bgText+1+160+2*32
+	ldy	#message3
+	jsr	DrawString
+	ldx	#bgText+1+160+4*32
+	ldy	#message4
+	jsr	DrawString
+	ldx	#bgText+1+160+6*32
+	ldy	#message5
+	jsr	DrawString
 	
 	lda	#81h
 	sta	REG_NMITIMEN
@@ -83,19 +95,16 @@ main:
 	wai
 	lda	#0Fh
 	sta	REG_INIDISP
-	
+
 	sei
 	jsr	spcBoot
 	cli
-	
+
 	lda	#^__SOUNDBANK__
 	jsr	spcSetBank
 	
-	ldx	#MOD_TEST
+	ldx	#MOD_POLLEN8
 	jsr	spcLoad
-	
-	ldx	#0
-	jsr	spcPlay
 	
 	lda	#39
 	jsr	spcAllocateSoundRegion
@@ -103,11 +112,15 @@ main:
 	jsr	spcFlush	
 	
 	ldx	#0
+	jsr	spcPlay
+	
+	ldx	#0
 	ldy	#4
 
 	lda	#^SoundTable|80h
 	ldy	#.LOWORD(SoundTable)
 	jsr	spcSetSoundTable
+	
 	
 	lda	#0
 main_loop:
@@ -123,10 +136,7 @@ main_loop:
 	bit	#JOYPAD_A
 	beq	@nkeypress_a
 
-	;spcPlaySoundM SND_TEST
-	ldx	#MOD_POLLEN8
-	jsr	spcLoad
-	
+	spcPlaySoundM SND_TEST
 @nkeypress_a:
 
 	lda	joy1_down+1
@@ -144,12 +154,21 @@ main_loop:
 	jsr	spcStop
 @nkeypress_x:
 
-;	lda	joy1_down
-;	bit	#JOYPAD_Y
-;	beq	@nkeypress_y
+	lda	joy1_down+1
+	bit	#JOYPADH_Y
+	beq	@nkeypress_y
 	
-;	jsr	spc
-;@nkeypress_y:
+	ldx	song_index
+	inx
+	cpx	#2
+	bne	:+
+	ldx	#0
+:
+	stx	song_index
+	jsr	spcLoad
+	ldx	#0
+	jsr	spcPlay
+@nkeypress_y:
 
 	jsr	spcProcess
 	wai
@@ -233,7 +252,15 @@ _nmi:
 	rti
 
 test_message:
-	.byte "Hello World", 0
+	.byte "Bonjour le monde!", 0
+message2:
+	.byte "A: Play Sound", 0
+message3:
+	.byte "B: Play Music", 0
+message4:
+	.byte "X: Stop Music", 0
+message5:
+	.byte "Y: Switch Song", 0
 	
 str_spc_ports:
 	.byte "SPC Ports", 0
