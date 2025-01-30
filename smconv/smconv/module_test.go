@@ -11,14 +11,16 @@ import (
 	"go.mukunda.com/modlib"
 )
 
-func read16(file *os.File) (result uint16) {
+func read16(file *os.File) uint16 {
+	var result uint16
 	binary.Read(file, binary.LittleEndian, &result)
-	return
+	return result
 }
 
-func read8(file *os.File) (result uint8) {
+func read8(file *os.File) uint8 {
+	var result uint8
 	binary.Read(file, binary.LittleEndian, &result)
-	return
+	return result
 }
 
 func TestSoundbankExport(t *testing.T) {
@@ -45,7 +47,6 @@ func TestSoundbankExport(t *testing.T) {
 }
 
 func TestSoundbankExport2(t *testing.T) {
-
 	bank := SoundBank{}
 
 	mod, _ := modlib.LoadModule("test/reflection.it")

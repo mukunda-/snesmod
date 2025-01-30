@@ -10,6 +10,8 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/stretchr/testify v1.10.0 h1:Xv5erBjTwe/5IxqUQTdXv5kgmIvbHo3QQyRwhJsOfJA=
 github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
+go.mukunda.com/errorcat v0.1.0 h1:jkCq44PcMHNFXfLlrww32CKFd0vCbhc2xdzxUa0/sBw=
+go.mukunda.com/errorcat v0.1.0/go.mod h1:GH5eqSjBQUkMewVwCbGBRLSS20vQjPJAlebmAlcNGLo=
 go.mukunda.com/modlib v0.1.0 h1:BGXKWbNNEJSYFguIHsUGTj9wXmam71vxVYLzAEy7S9Y=
 go.mukunda.com/modlib v0.1.0/go.mod h1:d5B5qolrXycnSAX6wZu5RuQeUtDJ+a3GbhDBqxEcxKk=
 go.mukunda.com/snesbrr/v2 v2.0.1 h1:uI09pAeaSovCrBDuRrgC0WSkM7ql2NQpeukHgs4zLmE=

@@ -10,31 +10,18 @@ package spc
 import (
 	"encoding/binary"
 	"io"
-)
 
-func pguard(err *error) {
-	if r := recover(); r != nil {
-		switch r.(type) {
-		case error:
-			*err = r.(error)
-		default:
-			panic(err)
-		}
-	}
-}
+	cat "go.mukunda.com/errorcat"
+)
 
 func bread(r io.Reader, data any) {
 	err := binary.Read(r, binary.LittleEndian, data)
-	if err != nil {
-		panic(err)
-	}
+	cat.Catch(err)
 }
 
 func bwrite(w io.Writer, data any) {
 	err := binary.Write(w, binary.LittleEndian, data)
-	if err != nil {
-		panic(err)
-	}
+	cat.Catch(err)
 }
 
 type SpcFile struct {
@@ -105,7 +92,7 @@ type Id6Tags struct {
 }
 
 func (spc *SpcFile) Read(r io.Reader) (rerr error) {
-	defer pguard(&rerr)
+	defer cat.Guard(&rerr)
 
 	bread(r, &spc.Header)
 	bread(r, &spc.Memory)
@@ -122,7 +109,7 @@ func (spc *SpcFile) Read(r io.Reader) (rerr error) {
 }
 
 func (spc *SpcFile) Write(w io.Writer) (rerr error) {
-	defer pguard(&rerr)
+	defer cat.Guard(&rerr)
 
 	bwrite(w, &spc.Header)
 	bwrite(w, &spc.Memory)

@@ -12,12 +12,14 @@ import (
 	"io"
 	"os"
 	"strings"
+
+	cat "go.mukunda.com/errorcat"
 )
 
 var ErrModuleSizeExceeded = errors.New("module size exceeded limit")
 
 func (bank *SoundBank) Export(filename string, hirom bool) (rerr error) {
-	defer pguard(&rerr)
+	defer cat.Guard(&rerr)
 
 	file, err := os.Create(filename)
 	if err != nil {
@@ -37,12 +39,12 @@ func (bank *SoundBank) Export(filename string, hirom bool) (rerr error) {
 
 	for _, module := range bank.Modules {
 		modulePointers = append(modulePointers, uint32(ptell(file)))
-		pcatch(module.Export(file, true))
+		cat.Catch(module.Export(file, true))
 	}
 
 	for _, source := range bank.Sources {
 		sourcePointers = append(sourcePointers, uint32(ptell(file)))
-		pcatch(source.Export(file, false))
+		cat.Catch(source.Export(file, false))
 	}
 
 	// export module pointers
@@ -85,7 +87,7 @@ func (bank *SoundBank) Export(filename string, hirom bool) (rerr error) {
 }
 
 func (mod *SmModule) Export(w io.WriteSeeker, writeHeader bool) (rerr error) {
-	defer pguard(&rerr)
+	defer cat.Guard(&rerr)
 
 	headerStart := ptell(w)
 
@@ -122,7 +124,7 @@ func (mod *SmModule) Export(w io.WriteSeeker, writeHeader bool) (rerr error) {
 		}
 
 		patternPointers = append(patternPointers, uint16(ptr+kModuleBase))
-		pcatch(mod.Patterns[i].Export(w))
+		cat.Catch(mod.Patterns[i].Export(w))
 	}
 
 	for i := 0; i < len(mod.Instruments); i++ {
@@ -134,7 +136,7 @@ func (mod *SmModule) Export(w io.WriteSeeker, writeHeader bool) (rerr error) {
 		}
 
 		instrumentPointers = append(instrumentPointers, uint16(ptr+kModuleBase))
-		pcatch(mod.Instruments[i].Export(w))
+		cat.Catch(mod.Instruments[i].Export(w))
 	}
 
 	for i := 0; i < len(mod.Samples); i++ {
@@ -146,7 +148,7 @@ func (mod *SmModule) Export(w io.WriteSeeker, writeHeader bool) (rerr error) {
 		}
 
 		samplePointers = append(samplePointers, uint16(ptr+kModuleBase))
-		pcatch(mod.Samples[i].Export(w))
+		cat.Catch(mod.Samples[i].Export(w))
 	}
 
 	moduleEnd := ptell(w)
@@ -201,7 +203,7 @@ func (mod *SmModule) Export(w io.WriteSeeker, writeHeader bool) (rerr error) {
 }
 
 func (smp *SmPattern) Export(w io.WriteSeeker) (rerr error) {
-	defer pguard(&rerr)
+	defer cat.Guard(&rerr)
 
 	bwrite(w, smp.Rows)
 	bwrite(w, smp.Data)
@@ -210,7 +212,7 @@ func (smp *SmPattern) Export(w io.WriteSeeker) (rerr error) {
 }
 
 func (smi *SmInstrument) Export(w io.WriteSeeker) (rerr error) {
-	defer pguard(&rerr)
+	defer cat.Guard(&rerr)
 
 	info1 := struct {
 		Fadeout        uint8
@@ -247,7 +249,7 @@ func (smi *SmInstrument) Export(w io.WriteSeeker) (rerr error) {
 }
 
 func (sms *SmSample) Export(w io.WriteSeeker) (rerr error) {
-	defer pguard(&rerr)
+	defer cat.Guard(&rerr)
 
 	bwrite(w, sms)
 
@@ -257,7 +259,7 @@ func (sms *SmSample) Export(w io.WriteSeeker) (rerr error) {
 // Export to a file. `dataOnly` writes the BRR data only. This is used when building an
 // SPC file. When the source is loaded into SPC memory, there is no header or alignment.
 func (source *Source) Export(w io.WriteSeeker, dataOnly bool) (rerr error) {
-	defer pguard(&rerr)
+	defer cat.Guard(&rerr)
 
 	if !dataOnly {
 		bwrite(w, uint16(len(source.Data)))
@@ -277,7 +279,7 @@ func (source *Source) Export(w io.WriteSeeker, dataOnly bool) (rerr error) {
 
 // Write ca65 assembly source file that includes the soundbank binary.
 func (bank *SoundBank) ExportAssembly(filename string, binfile string) (rerr error) {
-	pguard(&rerr)
+	defer cat.Guard(&rerr)
 
 	file, err := os.Create(filename)
 	if err != nil {
@@ -305,7 +307,7 @@ __SOUNDBANK__:
 
 // Write ca65 assembly include file that contains the soundbank definitions.
 func (bank *SoundBank) ExportAssemblyInclude(filename string) (rerr error) {
-	pguard(&rerr)
+	defer cat.Guard(&rerr)
 
 	f, err := os.Create(filename)
 	if err != nil {
