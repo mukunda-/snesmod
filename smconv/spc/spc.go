@@ -11,15 +11,17 @@ import (
 	"encoding/binary"
 	"io"
 
-	cat "go.mukunda.com/errorcat"
+	"go.mukunda.com/errorcat"
 )
 
-func bread(r io.Reader, data any) {
+type eC = errorcat.Context
+
+func bread(cat eC, r io.Reader, data any) {
 	err := binary.Read(r, binary.LittleEndian, data)
 	cat.Catch(err)
 }
 
-func bwrite(w io.Writer, data any) {
+func bwrite(cat eC, w io.Writer, data any) {
 	err := binary.Write(w, binary.LittleEndian, data)
 	cat.Catch(err)
 }
@@ -91,34 +93,36 @@ type Id6Tags struct {
 	_                      [45]byte
 }
 
-func (spc *SpcFile) Read(r io.Reader) (rerr error) {
-	defer cat.Guard(&rerr)
+func (spc *SpcFile) Read(r io.Reader) error {
+	return errorcat.Guard(func(cat eC) error {
 
-	bread(r, &spc.Header)
-	bread(r, &spc.Memory)
-	bread(r, &spc.DspRegisters)
-	bread(r, &spc.Reserved)
-	bread(r, &spc.IplRom)
+		bread(cat, r, &spc.Header)
+		bread(cat, r, &spc.Memory)
+		bread(cat, r, &spc.DspRegisters)
+		bread(cat, r, &spc.Reserved)
+		bread(cat, r, &spc.IplRom)
 
-	var err error
-	if spc.Extended, err = io.ReadAll(r); err != nil {
-		return err
-	}
+		var err error
+		if spc.Extended, err = io.ReadAll(r); err != nil {
+			return err
+		}
 
-	return nil
+		return nil
+	})
 }
 
-func (spc *SpcFile) Write(w io.Writer) (rerr error) {
-	defer cat.Guard(&rerr)
+func (spc *SpcFile) Write(w io.Writer) error {
+	return errorcat.Guard(func(cat eC) error {
 
-	bwrite(w, &spc.Header)
-	bwrite(w, &spc.Memory)
-	bwrite(w, &spc.DspRegisters)
-	bwrite(w, &spc.Reserved)
-	bwrite(w, &spc.IplRom)
-	bwrite(w, spc.Extended)
+		bwrite(cat, w, &spc.Header)
+		bwrite(cat, w, &spc.Memory)
+		bwrite(cat, w, &spc.DspRegisters)
+		bwrite(cat, w, &spc.Reserved)
+		bwrite(cat, w, &spc.IplRom)
+		bwrite(cat, w, spc.Extended)
 
-	return nil
+		return nil
+	})
 }
 
 func NewSpcFile() *SpcFile {

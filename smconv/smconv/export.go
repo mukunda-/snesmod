@@ -13,280 +13,283 @@ import (
 	"os"
 	"strings"
 
-	cat "go.mukunda.com/errorcat"
+	"go.mukunda.com/errorcat"
 )
 
 var ErrModuleSizeExceeded = errors.New("module size exceeded limit")
 
 func (bank *SoundBank) Export(filename string, hirom bool) (rerr error) {
-	defer cat.Guard(&rerr)
+	return errorcat.Guard(func(cat eC) error {
 
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
+		file, err := os.Create(filename)
+		if err != nil {
+			return err
+		}
 
-	bwrite(file, uint16(len(bank.Sources)))
-	bwrite(file, uint16(len(bank.Modules)))
+		bwrite(cat, file, uint16(len(bank.Sources)))
+		bwrite(cat, file, uint16(len(bank.Modules)))
 
-	// reserve space for tables
-	for i := 0; i < 128+len(bank.Sources); i++ {
-		bwrite(file, []byte{0xAA, 0xAA, 0xAA})
-	}
+		// reserve space for tables
+		for i := 0; i < 128+len(bank.Sources); i++ {
+			bwrite(cat, file, []byte{0xAA, 0xAA, 0xAA})
+		}
 
-	modulePointers := []uint32{}
-	sourcePointers := []uint32{}
+		modulePointers := []uint32{}
+		sourcePointers := []uint32{}
 
-	for _, module := range bank.Modules {
-		modulePointers = append(modulePointers, uint32(ptell(file)))
-		cat.Catch(module.Export(file, true))
-	}
+		for _, module := range bank.Modules {
+			modulePointers = append(modulePointers, uint32(ptell(cat, file)))
+			cat.Catch(module.Export(file, true))
+		}
 
-	for _, source := range bank.Sources {
-		sourcePointers = append(sourcePointers, uint32(ptell(file)))
-		cat.Catch(source.Export(file, false))
-	}
+		for _, source := range bank.Sources {
+			sourcePointers = append(sourcePointers, uint32(ptell(cat, file)))
+			cat.Catch(source.Export(file, false))
+		}
 
-	// export module pointers
-	pseek(file, 4, io.SeekStart)
+		// export module pointers
+		pseek(cat, file, 4, io.SeekStart)
 
-	for i := 0; i < 128; i++ {
-		addr := uint16(0)
-		addrBank := uint8(0)
-		if i < len(bank.Modules) {
-			if hirom { // 64k banks
-				addr = uint16(modulePointers[i] & 65535)
-				addrBank = uint8(modulePointers[i] >> 16)
-			} else { // 32k banks
-				addr = uint16(0x8000 + (modulePointers[i] & 32767))
-				addrBank = uint8(modulePointers[i] >> 15)
+		for i := 0; i < 128; i++ {
+			addr := uint16(0)
+			addrBank := uint8(0)
+			if i < len(bank.Modules) {
+				if hirom { // 64k banks
+					addr = uint16(modulePointers[i] & 65535)
+					addrBank = uint8(modulePointers[i] >> 16)
+				} else { // 32k banks
+					addr = uint16(0x8000 + (modulePointers[i] & 32767))
+					addrBank = uint8(modulePointers[i] >> 15)
+				}
 			}
+
+			bwrite(cat, file, addr)
+			bwrite(cat, file, addrBank)
 		}
 
-		bwrite(file, addr)
-		bwrite(file, addrBank)
-	}
+		// export source pointers
+		for i := 0; i < len(bank.Sources); i++ {
+			addr := uint16(0)
+			addrBank := uint8(0)
+			if hirom { // 64k banks
+				addr = uint16(sourcePointers[i] & 65535)
+				addrBank = uint8(sourcePointers[i] >> 16)
+			} else { // 32k banks
+				addr = uint16(0x8000 + (sourcePointers[i] & 32767))
+				addrBank = uint8(sourcePointers[i] >> 15)
+			}
 
-	// export source pointers
-	for i := 0; i < len(bank.Sources); i++ {
-		addr := uint16(0)
-		addrBank := uint8(0)
-		if hirom { // 64k banks
-			addr = uint16(sourcePointers[i] & 65535)
-			addrBank = uint8(sourcePointers[i] >> 16)
-		} else { // 32k banks
-			addr = uint16(0x8000 + (sourcePointers[i] & 32767))
-			addrBank = uint8(sourcePointers[i] >> 15)
+			bwrite(cat, file, addr)
+			bwrite(cat, file, addrBank)
 		}
 
-		bwrite(file, addr)
-		bwrite(file, addrBank)
-	}
-
-	return nil
+		return nil
+	})
 }
 
 func (mod *SmModule) Export(w io.WriteSeeker, writeHeader bool) (rerr error) {
-	defer cat.Guard(&rerr)
+	return errorcat.Guard(func(cat eC) error {
 
-	headerStart := ptell(w)
+		headerStart := ptell(cat, w)
 
-	mod.BankHeader.ModuleSize = 0xAAAA
-	mod.BankHeader.SourceListCount = uint16(len(mod.SourceList))
+		mod.BankHeader.ModuleSize = 0xAAAA
+		mod.BankHeader.SourceListCount = uint16(len(mod.SourceList))
 
-	if writeHeader {
-		// Reserve for module size
-		bwrite(w, mod.BankHeader)
-		bwrite(w, mod.SourceList)
-	}
-
-	moduleStart := ptell(w)
-
-	pointers := SmModuleHeaderPointers{}
-
-	bwrite(w, mod.Header)
-
-	patternPointers := []uint16{}
-	instrumentPointers := []uint16{}
-	samplePointers := []uint16{}
-
-	startOfPointers := ptell(w)
-
-	// This is just to reserve space for now. We'll fill it in after.
-	bwrite(w, pointers)
-
-	for i := 0; i < len(mod.Patterns); i++ {
-		ptr := ptell(w)
-		ptr -= moduleStart
-
-		if ptr > kSpcRamSize {
-			return ErrModuleSizeExceeded
+		if writeHeader {
+			// Reserve for module size
+			bwrite(cat, w, mod.BankHeader)
+			bwrite(cat, w, mod.SourceList)
 		}
 
-		patternPointers = append(patternPointers, uint16(ptr+kModuleBase))
-		cat.Catch(mod.Patterns[i].Export(w))
-	}
+		moduleStart := ptell(cat, w)
 
-	for i := 0; i < len(mod.Instruments); i++ {
-		ptr := ptell(w)
-		ptr -= moduleStart
+		pointers := SmModuleHeaderPointers{}
 
-		if ptr > kSpcRamSize {
-			return ErrModuleSizeExceeded
+		bwrite(cat, w, mod.Header)
+
+		patternPointers := []uint16{}
+		instrumentPointers := []uint16{}
+		samplePointers := []uint16{}
+
+		startOfPointers := ptell(cat, w)
+
+		// This is just to reserve space for now. We'll fill it in after.
+		bwrite(cat, w, pointers)
+
+		for i := 0; i < len(mod.Patterns); i++ {
+			ptr := ptell(cat, w)
+			ptr -= moduleStart
+
+			if ptr > kSpcRamSize {
+				return ErrModuleSizeExceeded
+			}
+
+			patternPointers = append(patternPointers, uint16(ptr+kModuleBase))
+			cat.Catch(mod.Patterns[i].Export(w))
 		}
 
-		instrumentPointers = append(instrumentPointers, uint16(ptr+kModuleBase))
-		cat.Catch(mod.Instruments[i].Export(w))
-	}
+		for i := 0; i < len(mod.Instruments); i++ {
+			ptr := ptell(cat, w)
+			ptr -= moduleStart
 
-	for i := 0; i < len(mod.Samples); i++ {
-		ptr := ptell(w)
-		ptr -= moduleStart
+			if ptr > kSpcRamSize {
+				return ErrModuleSizeExceeded
+			}
 
-		if ptr > kSpcRamSize {
-			return ErrModuleSizeExceeded
+			instrumentPointers = append(instrumentPointers, uint16(ptr+kModuleBase))
+			cat.Catch(mod.Instruments[i].Export(w))
 		}
 
-		samplePointers = append(samplePointers, uint16(ptr+kModuleBase))
-		cat.Catch(mod.Samples[i].Export(w))
-	}
+		for i := 0; i < len(mod.Samples); i++ {
+			ptr := ptell(cat, w)
+			ptr -= moduleStart
 
-	moduleEnd := ptell(w)
+			if ptr > kSpcRamSize {
+				return ErrModuleSizeExceeded
+			}
 
-	// Align end to 2 bytes.
-	if moduleEnd&1 != 0 {
-		bwrite(w, uint8(0))
-		moduleEnd++
-	}
-
-	if writeHeader {
-		pseek(w, headerStart, io.SeekStart)
-
-		// +1 for rouding up last word (not needed with the align above.
-		modSize := uint16((moduleEnd - moduleStart + 1) >> 1)
-		bwrite(w, modSize)
-	}
-
-	pseek(w, startOfPointers, io.SeekStart)
-
-	for i := 0; i < 64; i++ {
-		if i < len(mod.Patterns) {
-			pointers.PatternsL[i] = byte(patternPointers[i] & 0xFF)
-			pointers.PatternsH[i] = byte(patternPointers[i] >> 8)
-		} else {
-			pointers.PatternsL[i] = 0xFF
-			pointers.PatternsH[i] = 0xFF
+			samplePointers = append(samplePointers, uint16(ptr+kModuleBase))
+			cat.Catch(mod.Samples[i].Export(w))
 		}
 
-		if i < len(mod.Instruments) {
-			pointers.InstrumentsL[i] = byte(instrumentPointers[i] & 0xFF)
-			pointers.InstrumentsH[i] = byte(instrumentPointers[i] >> 8)
-		} else {
-			pointers.InstrumentsL[i] = 0xFF
-			pointers.InstrumentsH[i] = 0xFF
+		moduleEnd := ptell(cat, w)
+
+		// Align end to 2 bytes.
+		if moduleEnd&1 != 0 {
+			bwrite(cat, w, uint8(0))
+			moduleEnd++
 		}
 
-		if i < len(mod.Samples) {
-			pointers.SamplesL[i] = byte(samplePointers[i] & 0xFF)
-			pointers.SamplesH[i] = byte(samplePointers[i] >> 8)
-		} else {
-			pointers.SamplesL[i] = 0xFF
-			pointers.SamplesH[i] = 0xFF
+		if writeHeader {
+			pseek(cat, w, headerStart, io.SeekStart)
+
+			// +1 for rouding up last word (not needed with the align above.
+			modSize := uint16((moduleEnd - moduleStart + 1) >> 1)
+			bwrite(cat, w, modSize)
 		}
-	}
 
-	bwrite(w, pointers)
+		pseek(cat, w, startOfPointers, io.SeekStart)
 
-	pseek(w, moduleEnd, io.SeekStart)
+		for i := 0; i < 64; i++ {
+			if i < len(mod.Patterns) {
+				pointers.PatternsL[i] = byte(patternPointers[i] & 0xFF)
+				pointers.PatternsH[i] = byte(patternPointers[i] >> 8)
+			} else {
+				pointers.PatternsL[i] = 0xFF
+				pointers.PatternsH[i] = 0xFF
+			}
 
-	return nil
+			if i < len(mod.Instruments) {
+				pointers.InstrumentsL[i] = byte(instrumentPointers[i] & 0xFF)
+				pointers.InstrumentsH[i] = byte(instrumentPointers[i] >> 8)
+			} else {
+				pointers.InstrumentsL[i] = 0xFF
+				pointers.InstrumentsH[i] = 0xFF
+			}
+
+			if i < len(mod.Samples) {
+				pointers.SamplesL[i] = byte(samplePointers[i] & 0xFF)
+				pointers.SamplesH[i] = byte(samplePointers[i] >> 8)
+			} else {
+				pointers.SamplesL[i] = 0xFF
+				pointers.SamplesH[i] = 0xFF
+			}
+		}
+
+		bwrite(cat, w, pointers)
+		pseek(cat, w, moduleEnd, io.SeekStart)
+
+		return nil
+	})
 }
 
 func (smp *SmPattern) Export(w io.WriteSeeker) (rerr error) {
-	defer cat.Guard(&rerr)
+	return errorcat.Guard(func(cat eC) error {
 
-	bwrite(w, smp.Rows)
-	bwrite(w, smp.Data)
+		bwrite(cat, w, smp.Rows)
+		bwrite(cat, w, smp.Data)
 
-	return nil
+		return nil
+	})
 }
 
 func (smi *SmInstrument) Export(w io.WriteSeeker) (rerr error) {
-	defer cat.Guard(&rerr)
+	return errorcat.Guard(func(cat eC) error {
 
-	info1 := struct {
-		Fadeout        uint8
-		SampleIndex    uint8
-		GlobalVolume   uint8
-		SetPanning     uint8
-		EnvelopeLength uint8
-	}{}
+		info1 := struct {
+			Fadeout        uint8
+			SampleIndex    uint8
+			GlobalVolume   uint8
+			SetPanning     uint8
+			EnvelopeLength uint8
+		}{}
 
-	info1.Fadeout = smi.Info.Fadeout
-	info1.SampleIndex = smi.Info.SampleIndex
-	info1.GlobalVolume = smi.Info.GlobalVolume
-	info1.SetPanning = smi.Info.SetPanning
-	info1.EnvelopeLength = smi.Info.EnvelopeLength
+		info1.Fadeout = smi.Info.Fadeout
+		info1.SampleIndex = smi.Info.SampleIndex
+		info1.GlobalVolume = smi.Info.GlobalVolume
+		info1.SetPanning = smi.Info.SetPanning
+		info1.EnvelopeLength = smi.Info.EnvelopeLength
 
-	bwrite(w, info1)
+		bwrite(cat, w, info1)
 
-	if smi.Info.EnvelopeLength > 0 {
-		info2 := struct {
-			EnvelopeSustain   uint8
-			EnvelopeLoopStart uint8
-			EnvelopeLoopEnd   uint8
-		}{
-			EnvelopeSustain:   smi.Info.EnvelopeSustain,
-			EnvelopeLoopStart: smi.Info.EnvelopeLoopStart,
-			EnvelopeLoopEnd:   smi.Info.EnvelopeLoopEnd,
+		if smi.Info.EnvelopeLength > 0 {
+			info2 := struct {
+				EnvelopeSustain   uint8
+				EnvelopeLoopStart uint8
+				EnvelopeLoopEnd   uint8
+			}{
+				EnvelopeSustain:   smi.Info.EnvelopeSustain,
+				EnvelopeLoopStart: smi.Info.EnvelopeLoopStart,
+				EnvelopeLoopEnd:   smi.Info.EnvelopeLoopEnd,
+			}
+
+			bwrite(cat, w, info2)
+			bwrite(cat, w, smi.Envelope)
 		}
 
-		bwrite(w, info2)
-		bwrite(w, smi.Envelope)
-	}
-
-	return nil
+		return nil
+	})
 }
 
 func (sms *SmSample) Export(w io.WriteSeeker) (rerr error) {
-	defer cat.Guard(&rerr)
+	return errorcat.Guard(func(cat eC) error {
 
-	bwrite(w, sms)
+		bwrite(cat, w, sms)
 
-	return nil
+		return nil
+	})
 }
 
 // Export to a file. `dataOnly` writes the BRR data only. This is used when building an
 // SPC file. When the source is loaded into SPC memory, there is no header or alignment.
 func (source *Source) Export(w io.WriteSeeker, dataOnly bool) (rerr error) {
-	defer cat.Guard(&rerr)
+	return errorcat.Guard(func(cat eC) error {
 
-	if !dataOnly {
-		bwrite(w, uint16(len(source.Data)))
-		bwrite(w, uint16(source.Loop))
-	}
-
-	bwrite(w, source.Data)
-
-	if !dataOnly {
-		if len(source.Data)&1 != 0 {
-			bwrite(w, uint8(0))
+		if !dataOnly {
+			bwrite(cat, w, uint16(len(source.Data)))
+			bwrite(cat, w, uint16(source.Loop))
 		}
-	}
 
-	return nil
+		bwrite(cat, w, source.Data)
+
+		if !dataOnly {
+			if len(source.Data)&1 != 0 {
+				bwrite(cat, w, uint8(0))
+			}
+		}
+
+		return nil
+	})
 }
 
 // Write ca65 assembly source file that includes the soundbank binary.
 func (bank *SoundBank) ExportAssembly(filename string, binfile string) (rerr error) {
-	defer cat.Guard(&rerr)
+	return errorcat.Guard(func(cat eC) error {
 
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
+		file, err := os.Create(filename)
+		cat.Catch(err)
 
-	bwrite(file, []byte(`; SNESMOD Soundbank Data
+		bwrite(cat, file, []byte(`; SNESMOD Soundbank Data
 ; Generated by SMCONV
 
 	.global __SOUNDBANK__
@@ -294,51 +297,50 @@ func (bank *SoundBank) ExportAssembly(filename string, binfile string) (rerr err
 __SOUNDBANK__:
 `))
 
-	binfile = strings.ReplaceAll(binfile, "\\", "/")
-	lastSlash := strings.LastIndex(binfile, "/")
-	if lastSlash != -1 {
-		binfile = binfile[lastSlash+1:]
-	}
+		binfile = strings.ReplaceAll(binfile, "\\", "/")
+		lastSlash := strings.LastIndex(binfile, "/")
+		if lastSlash != -1 {
+			binfile = binfile[lastSlash+1:]
+		}
 
-	bwrite(file, []byte(fmt.Sprintf("\t.incbin \"%s\"\n", binfile)))
+		bwrite(cat, file, []byte(fmt.Sprintf("\t.incbin \"%s\"\n", binfile)))
 
-	return nil
+		return nil
+	})
 }
 
 // Write ca65 assembly include file that contains the soundbank definitions.
-func (bank *SoundBank) ExportAssemblyInclude(filename string) (rerr error) {
-	defer cat.Guard(&rerr)
+func (bank *SoundBank) ExportAssemblyInclude(filename string) error {
+	return errorcat.Guard(func(cat eC) error {
+		f, err := os.Create(filename)
+		cat.Catch(err)
+		defer f.Close()
 
-	f, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
+		bwrite(cat, f, []byte(`; SNESMOD Soundbank Definitions
+	; GENERATED BY SMCONV
 
-	bwrite(f, []byte(`; SNESMOD Soundbank Definitions
-; GENERATED BY SMCONV
+	.ifndef __SOUNDBANK_DEFINITIONS__
+	.define __SOUNDBANK_DEFINITIONS__
 
-.ifndef __SOUNDBANK_DEFINITIONS__
-.define __SOUNDBANK_DEFINITIONS__
+	.import __SOUNDBANK__
 
-.import __SOUNDBANK__
+	`))
 
-`))
-
-	for index, mod := range bank.Modules {
-		if mod.Id != "" {
-			bwrite(f, []byte(fmt.Sprintf("%-32s = %d\n", mod.Id, index)))
+		for index, mod := range bank.Modules {
+			if mod.Id != "" {
+				bwrite(cat, f, []byte(fmt.Sprintf("%-32s = %d\n", mod.Id, index)))
+			}
 		}
-	}
 
-	bwrite(f, []byte("\n"))
+		bwrite(cat, f, []byte("\n"))
 
-	for index, source := range bank.Sources {
-		if source.Id != "" {
-			bwrite(f, []byte(fmt.Sprintf("%-32s = %d\n", source.Id, index)))
+		for index, source := range bank.Sources {
+			if source.Id != "" {
+				bwrite(cat, f, []byte(fmt.Sprintf("%-32s = %d\n", source.Id, index)))
+			}
 		}
-	}
-	bwrite(f, []byte("\n.endif ; __SOUNDBANK_DEFINITIONS__\n"))
+		bwrite(cat, f, []byte("\n.endif ; __SOUNDBANK_DEFINITIONS__\n"))
 
-	return nil
+		return nil
+	})
 }
